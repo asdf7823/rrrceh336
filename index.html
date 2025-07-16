@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>전자 껍질 3D 시뮬레이션</title>
+  <style>
+    body {
+      background: #0b0c10;
+      color: white;
+      font-family: 'Segoe UI', sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      color: #66fcf1;
+    }
+    canvas {
+      background-color: #1f2833;
+      border: 2px solid #45a29e;
+      border-radius: 10px;
+      display: block;
+      margin: 20px auto;
+    }
+    .controls {
+      margin-bottom: 20px;
+    }
+    .controls input {
+      width: 60px;
+      padding: 8px;
+      margin: 5px;
+      border: 1px solid #66fcf1;
+      border-radius: 8px;
+      background: #0b0c10;
+      color: white;
+      text-align: center;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #66fcf1;
+      color: #0b0c10;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+    button:hover {
+      background-color: #45a29e;
+    }
+    .result {
+      margin-top: 20px;
+      font-size: 18px;
+    }
+    .highlight {
+      color: #f1fa8c;
+    }
+    .ground {
+      color: #00ff88;
+    }
+    .excited {
+      color: #ff5555;
+    }
+    .unknown {
+      color: #999999;
+    }
+  </style>
+</head>
+<body>
+  <h1>전자 껍질 3D 시뮬레이션</h1>
+
+  <div class="controls">
+    <label>K: <input type="number" id="kShell" min="0" max="2" value="2"></label>
+    <label>L: <input type="number" id="lShell" min="0" max="8" value="8"></label>
+    <label>M: <input type="number" id="mShell" min="0" max="18" value="1"></label>
+    <label>N: <input type="number" id="nShell" min="0" max="32" value="0"></label>
+    <br>
+    <button onclick="simulate()">시뮬레이션 시작</button>
+  </div>
+
+  <canvas id="canvas" width="600" height="600"></canvas>
+
+  <div class="result" id="resultArea"></div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+
+    const knownAtoms = {
+      "1": [1, 0, 0, 0], "2": [2, 0, 0, 0],
+      "3": [2, 1, 0, 0], "4": [2, 2, 0, 0],
+      "5": [2, 3, 0, 0], "6": [2, 4, 0, 0],
+      "7": [2, 5, 0, 0], "8": [2, 6, 0, 0],
+      "9": [2, 7, 0, 0], "10": [2, 8, 0, 0],
+      "11": [2, 8, 1, 0], "12": [2, 8, 2, 0],
+      "13": [2, 8, 3, 0], "14": [2, 8, 4, 0],
+      "15": [2, 8, 5, 0], "16": [2, 8, 6, 0],
+      "17": [2, 8, 7, 0], "18": [2, 8, 8, 0],
+      "19": [2, 8, 8, 1], "20": [2, 8, 8, 2]
+    };
+
+    const atomNames = {
+      "1": "수소", "2": "헬륨", "3": "리튬", "4": "베릴륨",
+      "5": "붕소", "6": "탄소", "7": "질소", "8": "산소",
+      "9": "플루오린", "10": "네온", "11": "나트륨",
+      "12": "마그네슘", "13": "알루미늄", "14": "규소",
+      "15": "인", "16": "황", "17": "염소", "18": "아르곤",
+      "19": "칼륨", "20": "칼슘"
+    };
+
+    let electrons = [];
+
+    function simulate() {
+      const k = +document.getElementById('kShell').value;
+      const l = +document.getElementById('lShell').value;
+      const m = +document.getElementById('mShell').value;
+      const n = +document.getElementById('nShell').value;
+      const config = [k, l, m, n];
+      const total = k + l + m + n;
+
+      let foundZ = null;
+      let state = "미확인 원소";
+      let stateClass = "unknown";
+
+      for (let z = 1; z <= 20; z++) {
+        const ground = knownAtoms[z.toString()];
+        const atomName = atomNames[z.toString()];
+        const groundTotal = ground.reduce((a, b) => a + b, 0);
+
+        if (total === z) {
+          foundZ = z;
+          if (JSON.stringify(config) === JSON.stringify(ground)) {
+            state = `바닥 상태의 ${atomName} (Z=${z})`;
+            stateClass = "ground";
+          } else {
+            state = `들뜬 상태의 ${atomName} (Z=${z})`;
+            stateClass = "excited";
+          }
+          break;
+        }
+      }
+
+      if (foundZ === null) {
+        state = "미확인 원소";
+        stateClass = "unknown";
+      }
+
+      document.getElementById("resultArea").innerHTML =
+        `🌐 전자 수: <span class="highlight">${total}</span><br>` +
+        `📌 상태: <span class="${stateClass}">${state}</span>`;
+
+      // 궤도 초기화
+      electrons = [];
+      const shells = [
+        { count: k, radius: 60, color: '#66fcf1' },
+        { count: l, radius: 100, color: '#45a29e' },
+        { count: m, radius: 140, color: '#c5c6c7' },
+        { count: n, radius: 180, color: '#be9fe1' }
+      ];
+
+      for (let shell of shells) {
+        for (let i = 0; i < shell.count; i++) {
+          const angle = (2 * Math.PI * i) / shell.count;
+          electrons.push({
+            r: shell.radius,
+            angle: angle,
+            speed: 0.01 + Math.random() * 0.01,
+            color: shell.color
+          });
+        }
+      }
+
+      animate();
+    }
+
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // 핵
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 20, 0, 2 * Math.PI);
+      ctx.fillStyle = "#ff2e63";
+      ctx.fill();
+
+      // 궤도
+      const orbitRadii = [60, 100, 140, 180];
+      ctx.strokeStyle = "#ffffff22";
+      orbitRadii.forEach(r => {
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, r, 0, 2 * Math.PI);
+        ctx.stroke();
+      });
+
+      // 전자 회전
+      for (let e of electrons) {
+        e.angle += e.speed;
+        const x = centerX + e.r * Math.cos(e.angle);
+        const y = centerY + e.r * Math.sin(e.angle);
+        ctx.beginPath();
+        ctx.arc(x, y, 5, 0, 2 * Math.PI);
+        ctx.fillStyle = e.color;
+        ctx.fill();
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    simulate(); // 최초 실행
+  </script>
+</body>
+</html>
